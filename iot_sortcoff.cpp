@@ -27,19 +27,17 @@ Servo topServo;
 Servo secondServo;
 
 int redFrequency = 0;
-int redFrequency2 = 0;
+int yellowFrequency = 0;
 int greenFrequency = 0;
-int greenFrequency2 = 0;
 int blueFrequency = 0;
 
 int redColor = 0;
-int redColor2 = 0;
-int redColor3 = 0;
+int yellowColor = 0;
 int greenColor = 0;
-int greenColor2 = 0;
 int blueColor = 0;
 
 int redCount = 0;
+int yellowCount = 0;
 int blueCount = 0;
 int greenCount = 0;
 
@@ -82,64 +80,88 @@ void setup() {
   secondServo.attach(13, 500, 2500);
 }
 
-void readColorSensor() {
+void detectYellowSensor() {
   digitalWrite(S2, LOW);
   digitalWrite(S3, LOW);
-  redFrequency = pulseIn(sensorOut, LOW, 500);
-  redColor = map(redFrequency, 25, 55, 255, 0);
-  // redColor2 = map(redFrequency, 104, 198, 255, 0);
-  // redColor3 = map(redFrequency, 139, 151, 255, 0);
+  yellowFrequency = pulseIn(sensorOut, LOW, 500);
+  yellowColor = map(yellowFrequency, 115, 171, 255, 0);
 
+  Serial.print(" Y = ");
+  Serial.print(yellowColor);
+  delay(500);
+}
+
+void detectGreenSensor() {
   digitalWrite(S2, HIGH);
   digitalWrite(S3, HIGH);
   greenFrequency = pulseIn(sensorOut, LOW, 500);
   greenColor = map(greenFrequency, 25, 54, 255, 0);
-  // greenColor2 = map(greenFrequency, 118, 182, 255, 0);
 
+  Serial.print(" G = ");
+  Serial.print(greenColor);
+  delay(500);
+}
+
+void detectRedSensor() {
+  digitalWrite(S2, LOW);
+  digitalWrite(S3, LOW);
+  redFrequency = pulseIn(sensorOut, LOW, 500);
+  redColor = map(redFrequency, 25, 55, 255, 0);
+
+  Serial.print(" R = ");
+  Serial.print(redColor);
+  delay(500);
+}
+
+void detectBlueSensor() {
   digitalWrite(S2, LOW);
   digitalWrite(S3, HIGH);
   blueFrequency = pulseIn(sensorOut, LOW, 500);
   blueColor = map(blueFrequency, 24, 55, 255, 0);
 
-  Serial.print("R = ");
-  Serial.print(redColor);
-  // Serial.print(" R 2 = ");
-  // Serial.print(redColor2);
-  // Serial.print(" R 3 = ");
-  // Serial.print(redColor3);
-  Serial.print(" G = ");
-  Serial.print(greenColor);
-  // Serial.print(" G 2 = ");
-  // Serial.print(greenColor2);
   Serial.print(" B = ");
   Serial.print(blueColor);
-  delay(2500);
+  delay(500);
 }
 
 void detectColorAndMoveServo() {
-  readColorSensor();
-
-  if (redColor > 115 && redColor < 250 && greenColor > 100 && greenColor < 250 && blueColor > 140 && blueColor < 260) {
+  detectGreenSensor();
+  if (greenColor >= 210 && greenColor <= 240) {
     Serial.println(" - GREEN detected!");
     greenCount += 1;
     topServo.write(20);
-  } else if (blueColor > redColor && blueColor > greenColor) {
-    Serial.println(" - BLUE detected!");
-    blueCount += 1;
-    topServo.write(50);
-
-    Firebase.RTDB.setInt(&fbdo, "/test/blue", blueCount);
-  } else if (redColor > 50 && redColor < 80 && greenColor > 0 && greenColor < 50 && blueColor > 20 && blueColor < 50) {
-    Serial.println(" - RED detected!");
-    redCount += 1;
-    topServo.write(90);
+  } else {
+    detectRedSensor();
+    if (redColor >= 145 && redColor <= 180) {
+      Serial.println(" - RED detected!");
+      redCount += 1;
+      topServo.write(90);
+    } else {
+      detectYellowSensor();
+      if (yellowColor >= 145 && yellowColor <= 180) {
+        Serial.println(" - YELLOW detected!");
+        yellowCount += 1;
+        topServo.write(50);
+      } else {
+        detectBlueSensor();
+        if (blueColor >= 145 && blueColor <= 180) {
+          Serial.println(" - BLUE detected!");
+          blueCount += 1;
+          topServo.write(0);
+          Firebase.RTDB.setInt(&fbdo, "/test/blue", blueCount);
+        }
+      }
+    }
   }
 
-  delay(500);             
-  secondServo.write(90);  
-  delay(500);             
+
+
+  delay(500);
+  secondServo.write(90);
+  delay(500);
 
   Firebase.RTDB.setInt(&fbdo, "/test/green", greenCount);
+  Firebase.RTDB.setInt(&fbdo, "/test/yellow", greenCount);
   Firebase.RTDB.setInt(&fbdo, "/test/red", redCount);
 
   Serial.print("blue : ");
@@ -148,6 +170,8 @@ void detectColorAndMoveServo() {
   Serial.println(greenCount);
   Serial.print("red : ");
   Serial.println(redCount);
+  Serial.print("yellow : ");
+  Serial.println(yellowCount);
   delay(500);
 }
 
@@ -169,7 +193,7 @@ void loop() {
 
   if (Firebase.RTDB.getInt(&fbdo, "/test/on")) {
     if (fbdo.dataType() == "int" && fbdo.intData() == 1) {
-      String currentUID = fbdo.stringData();            
+      String currentUID = fbdo.stringData();
       detectColorAndMoveServo();
     }
   } else {
